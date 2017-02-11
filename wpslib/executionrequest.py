@@ -19,10 +19,14 @@
 
 from PyQt4.QtCore import *
 from PyQt4 import QtXml
-from PyQt4.QtGui import QApplication,QMessageBox
+from PyQt4.QtGui import QApplication, QMessageBox
 from PyQt4.QtSql import *
 from qgis.core import QgsVectorFileWriter,  QgsDataSourceURI
-import os, sys, string, tempfile, base64
+import os
+import sys
+import string
+import tempfile
+import base64
 import wps.apicompat
 import cgi
 
@@ -31,11 +35,11 @@ import cgi
 #
 #<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 #<wps:Execute service="WPS" version="1.0.0"
-#xmlns:wps="http://www.opengis.net/wps/1.0.0"
-#xmlns:ows="http://www.opengis.net/ows/1.1"
-#xmlns:xlink="http://www.w3.org/1999/xlink"
-#xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-#xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd">
+# xmlns:wps="http://www.opengis.net/wps/1.0.0"
+# xmlns:ows="http://www.opengis.net/ows/1.1"
+# xmlns:xlink="http://www.w3.org/1999/xlink"
+# xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+# xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd">
 #
 #  <ows:Identifier>returner</ows:Identifier>
 #  <wps:DataInputs>
@@ -105,7 +109,7 @@ import cgi
 
 
 def createTmpBase64(rLayer):
-    tmpFile = tempfile.NamedTemporaryFile(prefix="base64", delete=False) 
+    tmpFile = tempfile.NamedTemporaryFile(prefix="base64", delete=False)
     tmpFileName = tmpFile.name
 #    try:
 #      tmpFile = tempfile.NamedTemporaryFile(prefix="base64", delete=False)
@@ -120,55 +124,60 @@ def createTmpBase64(rLayer):
 #      os.remove(tmpFile.name)
     if rLayer.dataProvider().name() == 'ogr' or rLayer.dataProvider().name() == 'gdal':
         infile = open(rLayer.source())
-        outfile = tmpFile #open(tmpFileName, 'w')
-        base64.encode(infile,outfile)
+        outfile = tmpFile  # open(tmpFileName, 'w')
+        base64.encode(infile, outfile)
         outfile.close()
         infile.close()
-        outfile =  open(tmpFileName, 'r')
+        outfile = open(tmpFileName, 'r')
         base64String = outfile.read()
         outfile.close()
         os.remove(tmpFileName)
         return base64String
     else:
-        QMessageBox.critical(None, QApplication.translate("QgsWps",'Error'),  QApplication.translate("QgsWps",'Datatype %s of layer %s is not supported!' % (rLayer.dataProvider().name(),  rLayer.name())))
+        QMessageBox.critical(None, QApplication.translate("QgsWps", 'Error'),  QApplication.translate(
+            "QgsWps", 'Datatype %s of layer %s is not supported!' % (rLayer.dataProvider().name(),  rLayer.name())))
         return ''
 
 #    except:
-#        QMessageBox.critical(None, QApplication.translate("QgsWps","Error"), QApplication.translate("QgsWps","Unable to create temporal file: ") + filename + QApplication.translate("QgsWps"," for base64 encoding") ) 
+#        QMessageBox.critical(None, QApplication.translate("QgsWps","Error"), QApplication.translate("QgsWps","Unable to create temporal file: ") + filename + QApplication.translate("QgsWps"," for base64 encoding") )
 #        return None
 
+
 def createTmpGML(vLayer, processSelection="False", supportedGML="GML2"):
-    if supportedGML == "": # Neither GML, GML2 or GML3 are supported!
-      return 0
+    if supportedGML == "":  # Neither GML, GML2 or GML3 are supported!
+        return 0
 
     myQTempFile = QTemporaryFile()
     myQTempFile.open()
-    tmpFile = myQTempFile.fileName()+".gml"
+    tmpFile = myQTempFile.fileName() + ".gml"
     myQTempFile.close()
 
     if vLayer.dataProvider().name() == "postgres":
-      encoding = getDBEncoding(vLayer.dataProvider())
+        encoding = getDBEncoding(vLayer.dataProvider())
     else:
-      encoding = vLayer.dataProvider().encoding()
+        encoding = vLayer.dataProvider().encoding()
 
     processSelected = False
     if processSelection and vLayer.selectedFeatureCount() > 0:
-      processSelected = True
+        processSelected = True
 
-    # FORMAT=GML3 only works with OGR >= 1.8.0, otherwise GML2 is always returned
+    # FORMAT=GML3 only works with OGR >= 1.8.0, otherwise GML2 is always
+    # returned
     if supportedGML == "GML3":
-      dso = ["FORMAT=GML3"]
-    else: # "GML" or "GML2"
-      dso = []
+        dso = ["FORMAT=GML3"]
+    else:  # "GML" or "GML2"
+        dso = []
     lco = []
-    error = QgsVectorFileWriter.writeAsVectorFormat(vLayer, tmpFile, encoding, vLayer.dataProvider().crs(), "GML",  processSelected,  "",  dso,  lco)
+    error = QgsVectorFileWriter.writeAsVectorFormat(
+        vLayer, tmpFile, encoding, vLayer.dataProvider().crs(), "GML",  processSelected,  "",  dso,  lco)
     if error != QgsVectorFileWriter.NoError:
         QMessageBox.information(None, 'Error',  'Process stopped with errors')
     else:
         myFile = QFile(tmpFile)
         if (not myFile.open(QIODevice.ReadOnly | QIODevice.Text)):
-          QMessageBox.information(None, '', QApplication.translate("QgsWps","File open problem"))
-          pass
+            QMessageBox.information(None, '', QApplication.translate(
+                "QgsWps", "File open problem"))
+            pass
 
         myGML = QTextStream(myFile)
         myGML.setCodec(encoding)
@@ -178,14 +187,15 @@ def createTmpGML(vLayer, processSelection="False", supportedGML="GML2"):
         gmlString += myGML.readAll()
         myFile.close()
         myFilePath = QFileInfo(myFile).dir().path()
-        myFileInfo = myFilePath+'/'+QFileInfo(myFile).completeBaseName()
-        QFile(myFileInfo+'.xsd').remove()
-        QFile(myFileInfo+'.gml').remove()
+        myFileInfo = myFilePath + '/' + QFileInfo(myFile).completeBaseName()
+        QFile(myFileInfo + '.xsd').remove()
+        QFile(myFileInfo + '.gml').remove()
     return pystring(gmlString).strip()
+
 
 def getDBEncoding(layerProvider):
     dbConnection = QgsDataSourceURI(layerProvider.dataSourceUri())
-    db = QSqlDatabase.addDatabase("QPSQL","WPSClient")
+    db = QSqlDatabase.addDatabase("QPSQL", "WPSClient")
     db.setHostName(dbConnection.host())
     db.setDatabaseName(dbConnection.database())
     db.setUserName(dbConnection.username())
@@ -193,11 +203,11 @@ def getDBEncoding(layerProvider):
     db.setPort(int(dbConnection.port()))
     db.open()
 
-    query =  "select pg_encoding_to_char(encoding) as encoding "
+    query = "select pg_encoding_to_char(encoding) as encoding "
     query += "from pg_catalog.pg_database "
-    query += "where datname = '"+dbConnection.database()+"' "
+    query += "where datname = '" + dbConnection.database() + "' "
 
-    result = QSqlQuery(query,db)
+    result = QSqlQuery(query, db)
     result.first()
     encoding = pystring(result.value(0))
     db.close()
@@ -223,14 +233,14 @@ class ExecutionRequest(QObject):
         identifier = htmlescape(self.process.processIdentifier)
         version = htmlescape(self.process.getServiceVersion())
         self.request = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
-        self.request += "<wps:Execute service=\"WPS\" version=\""+ version + "\"" + \
-                       " xmlns:wps=\"http://www.opengis.net/wps/1.0.0\"" + \
-                       " xmlns:ows=\"http://www.opengis.net/ows/1.1\"" +\
-                       " xmlns:xlink=\"http://www.w3.org/1999/xlink\"" +\
-                       " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""\
-                       " xsi:schemaLocation=\"http://www.opengis.net/wps/1.0.0" +\
-                       " http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd\">"
-        self.request += "<ows:Identifier>"+identifier+"</ows:Identifier>\n"
+        self.request += "<wps:Execute service=\"WPS\" version=\"" + version + "\"" + \
+            " xmlns:wps=\"http://www.opengis.net/wps/1.0.0\"" + \
+            " xmlns:ows=\"http://www.opengis.net/ows/1.1\"" +\
+            " xmlns:xlink=\"http://www.w3.org/1999/xlink\"" +\
+            " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""\
+            " xsi:schemaLocation=\"http://www.opengis.net/wps/1.0.0" +\
+            " http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd\">"
+        self.request += "<ows:Identifier>" + identifier + "</ows:Identifier>\n"
 
     def addExecuteRequestEnd(self):
         self.request += "</wps:Execute>"
@@ -244,69 +254,77 @@ class ExecutionRequest(QObject):
     def addExecuteRequestInputStart(self, identifier, includeData=True):
         identifier = htmlescape(identifier)
         self.request += "<wps:Input>\n"
-        self.request += "<ows:Identifier>"+identifier+"</ows:Identifier>\n"
-        self.request += "<ows:Title>"+identifier+"</ows:Title>\n"
-        if includeData: self.request += "<wps:Data>\n"
+        self.request += "<ows:Identifier>" + identifier + "</ows:Identifier>\n"
+        self.request += "<ows:Title>" + identifier + "</ows:Title>\n"
+        if includeData:
+            self.request += "<wps:Data>\n"
 
     def addExecuteRequestInputEnd(self, includeData=True):
-        if includeData: self.request += "</wps:Data>\n"
+        if includeData:
+            self.request += "</wps:Data>\n"
         self.request += "</wps:Input>\n"
 
     def addReferenceInput(self, identifier, mimeType, schema, encoding, ref):
-        # text/plain inputs ########################################################
+        # text/plain inputs ###################################################
         # Handle 'as reference' playlist
         mimeType = htmlescape(mimeType)
         schema = "schema=\"%s\"" % htmlescape(schema) if schema else ""
         encoding = "encoding=\"%s\"" % htmlescape(encoding) if encoding else ""
         ref = htmlescape(ref)
         self.addExecuteRequestInputStart(identifier, False)
-        self.request += "<wps:Reference mimeType=\"%s\" %s %s xlink:href=\"%s\" />\n" % (mimeType, schema, encoding, ref)
+        self.request += "<wps:Reference mimeType=\"%s\" %s %s xlink:href=\"%s\" />\n" % (
+            mimeType, schema, encoding, ref)
         self.addExecuteRequestInputEnd(False)
 
     def addPlainTextInput(self, identifier, text):
-        # text/plain inputs ########################################################
+        # text/plain inputs ###################################################
         # It's not a playlist
         self.addExecuteRequestInputStart(identifier)
-        self.request += "<wps:ComplexData>" + htmlescape(text) + "</wps:ComplexData>\n"
+        self.request += "<wps:ComplexData>" + \
+            htmlescape(text) + "</wps:ComplexData>\n"
         self.addExecuteRequestInputEnd()
 
     def addGeometryInput(self, identifier, mimeType, schema, encoding, gmldata, useSelected):
-        # Single raster and vector inputs ##########################################
+        # Single raster and vector inputs #####################################
         mimeType = htmlescape(mimeType)
         schema = htmlescape(schema)
         encoding = 'encoding="%s"' % htmlescape(encoding) if encoding else ''
-        #if self.tools.isMimeTypeVector(mimeType) != None and encoding != "base64":
+        # if self.tools.isMimeTypeVector(mimeType) != None and encoding !=
+        # "base64":
         self.addExecuteRequestInputStart(identifier)
-        
-        self.request += "<wps:ComplexData mimeType=\"%s\" schema=\"%s\" %s>" % (mimeType, schema, encoding)
+
+        self.request += "<wps:ComplexData mimeType=\"%s\" schema=\"%s\" %s>" % (
+            mimeType, schema, encoding)
         self.request += "<![CDATA["
-        self.request += gmldata.replace("> <","><")
+        self.request += gmldata.replace("> <", "><")
 
         self.request = self.request.replace("xsi:schemaLocation=\"http://ogr.maptools.org/ qt_temp.xsd\"",
-            "xsi:schemaLocation=\"" + schema.rsplit('/',1)[0] + "/ " + schema + "\"")
+                                            "xsi:schemaLocation=\"" + schema.rsplit('/', 1)[0] + "/ " + schema + "\"")
 
         self.request += "]]>"
         self.request += "</wps:ComplexData>\n"
-        
+
 #        self.request += "<wps:ComplexData mimeType=\"%s\" schema=\"%s\" %s>" % (mimeType, schema, encoding)
 #        self.request += gmldata.replace("> <","><")
-#          
-#        self.request = self.request.replace("xsi:schemaLocation=\"http://ogr.maptools.org/ qt_temp.xsd\"", 
+#
+#        self.request = self.request.replace("xsi:schemaLocation=\"http://ogr.maptools.org/ qt_temp.xsd\"",
 #            "xsi:schemaLocation=\"" + schema.rsplit('/',1)[0] + "/ " + schema + "\"")
-#        
+#
 #        self.request += "</wps:ComplexData>\n"
 
-        self.addExecuteRequestInputEnd()  
+        self.addExecuteRequestInputEnd()
 
     def addGeometryBase64Input(self, identifier, mimeType, data):
-        # Single raster and vector inputs ##########################################
+        # Single raster and vector inputs #####################################
         mimeType = htmlescape(mimeType)
-        #elif self.tools.isMimeTypeVector(mimeType) != None or self.tools.isMimeTypeRaster(mimeType) != None:
+        # elif self.tools.isMimeTypeVector(mimeType) != None or
+        # self.tools.isMimeTypeRaster(mimeType) != None:
         self.addExecuteRequestInputStart(identifier)
 
-        self.request += "<wps:ComplexData mimeType=\"" + mimeType + "\" encoding=\"base64\">\n"
+        self.request += "<wps:ComplexData mimeType=\"" + \
+            mimeType + "\" encoding=\"base64\">\n"
         self.request += createTmpBase64(data)
-        
+
         self.request += "</wps:ComplexData>\n"
         self.addExecuteRequestInputEnd()
 
@@ -314,7 +332,8 @@ class ExecutionRequest(QObject):
         mimeType = htmlescape(mimeType)
         self.addExecuteRequestInputStart(identifier)
 
-        self.request += "<wps:ComplexData mimeType=\"" + mimeType + "\" encoding=\"base64\">\n"
+        self.request += "<wps:ComplexData mimeType=\"" + \
+            mimeType + "\" encoding=\"base64\">\n"
 
         file = open(filename, 'r')
         self.request += base64.encodestring(file.read())
@@ -324,26 +343,30 @@ class ExecutionRequest(QObject):
         self.addExecuteRequestInputEnd()
 
     def addMultipleGeometryInput(self, identifier, mimeType, schema, encoding, gmldata, useSelected):
-        # Multiple raster and vector inputs ########################################
+        # Multiple raster and vector inputs ###################################
         mimeType = htmlescape(mimeType)
         schema = htmlescape(schema)
         encoding = 'encoding="%s"' % htmlescape(encoding) if encoding else ''
-        #if self.tools.isMimeTypeVector(mimeType) != None and mimeType == "text/xml":
+        # if self.tools.isMimeTypeVector(mimeType) != None and mimeType ==
+        # "text/xml":
         self.addExecuteRequestInputStart(identifier)
 
-        self.request += "<wps:ComplexData mimeType=\"%s\" schema=\"%s\" %s>" % (mimeType, schema, encoding)
+        self.request += "<wps:ComplexData mimeType=\"%s\" schema=\"%s\" %s>" % (
+            mimeType, schema, encoding)
         self.request += gmldata.replace("> <", "><")
 
         self.request += "</wps:ComplexData>\n"
         self.addExecuteRequestInputEnd()
 
     def addMultipleGeometryBase64Input(self, identifier, mimeType, data):
-        # Multiple raster and vector inputs ########################################
-        #elif self.tools.isMimeTypeVector(mimeType) != None or self.tools.isMimeTypeRaster(mimeType) != None:
+        # Multiple raster and vector inputs ###################################
+        # elif self.tools.isMimeTypeVector(mimeType) != None or
+        # self.tools.isMimeTypeRaster(mimeType) != None:
         mimeType = htmlescape(mimeType)
         self.addExecuteRequestInputStart(identifier)
 
-        self.request += "<wps:ComplexData mimeType=\"" + mimeType + "\" encoding=\"base64\">\n"
+        self.request += "<wps:ComplexData mimeType=\"" + \
+            mimeType + "\" encoding=\"base64\">\n"
         self.request += createTmpBase64(data)
 
         self.request += "</wps:ComplexData>\n"
@@ -351,43 +374,49 @@ class ExecutionRequest(QObject):
 
     def addLiteralDataInput(self, identifier, text):
         self.addExecuteRequestInputStart(identifier)
-        self.request += "<wps:LiteralData>"+htmlescape(unicode(text))+"</wps:LiteralData>\n"
+        self.request += "<wps:LiteralData>" + \
+            htmlescape(unicode(text)) + "</wps:LiteralData>\n"
         self.addExecuteRequestInputEnd()
 
     def addBoundingBoxInput(self, identifier, bboxArray):
         self.addExecuteRequestInputStart(identifier)
         self.request += '<wps:BoundingBoxData ows:dimensions="2">'
-        self.request += '<ows:LowerCorner>'+bboxArray[0]+' '+bboxArray[1]+'</ows:LowerCorner>'
-        self.request += '<ows:UpperCorner>'+bboxArray[2]+' '+bboxArray[3]+'</ows:UpperCorner>'          
+        self.request += '<ows:LowerCorner>' + \
+            bboxArray[0] + ' ' + bboxArray[1] + '</ows:LowerCorner>'
+        self.request += '<ows:UpperCorner>' + \
+            bboxArray[2] + ' ' + bboxArray[3] + '</ows:UpperCorner>'
         self.request += "</wps:BoundingBoxData>\n"
         self.addExecuteRequestInputEnd()
 
     def addResponseFormStart(self):
         self.request += "<wps:ResponseForm>\n"
-        # The server should store the result. No lineage should be returned or status
+        # The server should store the result. No lineage should be returned or
+        # status
         self.request += "<wps:ResponseDocument lineage=\"false\" storeExecuteResponse=\"false\" status=\"false\">\n"
 
     def addResponseFormEnd(self):
         self.request += "</wps:ResponseDocument>\n"
-        self.request  += "</wps:ResponseForm>\n"
+        self.request += "</wps:ResponseForm>\n"
 
     def addLiteralDataOutput(self, identifier):
-        # Attach ALL literal outputs #############################################        
+        # Attach ALL literal outputs ##########################################
         self.request += "<wps:Output>\n"
-        self.request += "<ows:Identifier>"+identifier+"</ows:Identifier>\n"
+        self.request += "<ows:Identifier>" + identifier + "</ows:Identifier>\n"
         self.request += "</wps:Output>\n"
 
     def addReferenceOutput(self, identifier, mimeType, schema, encoding):
         mimeType = htmlescape(mimeType)
         schema = "schema=\"%s\"" % htmlescape(schema) if schema else ""
         encoding = "encoding=\"%s\"" % htmlescape(encoding) if encoding else ""
-        self.request += "<wps:Output asReference=\"true\" mimeType=\"%s\" %s %s >" % (mimeType, schema, encoding)
-        
-        # Playlists can be sent as reference or as complex data 
+        self.request += "<wps:Output asReference=\"true\" mimeType=\"%s\" %s %s >" % (
+            mimeType, schema, encoding)
+
+        # Playlists can be sent as reference or as complex data
         #   For the latter, comment out next lines
-        #self.request += "<wps:Output asReference=\"" + \
+        # self.request += "<wps:Output asReference=\"" + \
         #  ("false" if "playlist" in mimeType.lower() else "true") + \
         #  "\" mimeType=\"" + mimeType + \
         #  (("\" schema=\"" + schema) if schema != "" else "") + "\">"
-        self.request += "<ows:Identifier>" + htmlescape(identifier) + "</ows:Identifier>\n"
+        self.request += "<ows:Identifier>" + \
+            htmlescape(identifier) + "</ows:Identifier>\n"
         self.request += "</wps:Output>\n"
